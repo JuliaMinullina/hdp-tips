@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useMemo } from "react";
+import { use, useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getModuleById } from "@/data/modules";
 import { useProgress } from "@/lib/progress";
@@ -8,7 +8,17 @@ import { Question } from "@/data/types";
 import { QuestionCard } from "@/components/question-card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Lock, Send, Construction } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
+import {
+  ArrowLeft,
+  Lock,
+  Send,
+  Construction,
+  RotateCcw,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
 
 export default function TestPage({
   params,
@@ -17,16 +27,34 @@ export default function TestPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { isModuleAvailable, submitResults, isLoaded } = useProgress();
+  const {
+    isModuleAvailable,
+    submitResults,
+    resetModuleProgress,
+    getModuleProgress,
+    isLoaded,
+  } = useProgress();
 
   const mod = getModuleById(id);
+  const mp = isLoaded ? getModuleProgress(id) : undefined;
 
   const allQuestions = useMemo(() => {
     if (!mod) return [];
     return mod.testSections.flatMap((s) => s.questions);
   }, [mod]);
 
+  const hasResults = !!(mp?.lastAttemptResults && Object.keys(mp.lastAttemptResults).length > 0);
+
+  const [reviewMode, setReviewMode] = useState(true);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isLoaded && !hasResults) {
+      setReviewMode(false);
+    }
+  }, [isLoaded, hasResults]);
+
+  const isReviewing = hasResults && reviewMode;
 
   if (!mod) {
     return (
@@ -82,8 +110,10 @@ export default function TestPage({
     setAnswers((prev) => ({ ...prev, [qid]: value }));
   };
 
-  const answeredCount = Object.keys(answers).filter(
-    (k) => answers[k]?.trim() !== ""
+  const activeAnswers = isReviewing ? (mp?.lastAttemptAnswers ?? {}) : answers;
+
+  const answeredCount = Object.keys(activeAnswers).filter(
+    (k) => activeAnswers[k]?.trim() !== ""
   ).length;
 
   const handleSubmit = () => {
@@ -108,6 +138,21 @@ export default function TestPage({
     router.push(`/module/${id}/results`);
   };
 
+  const handleRetake = () => {
+    resetModuleProgress(id);
+    setAnswers({});
+    setReviewMode(false);
+  };
+
+  const reviewScore = isReviewing
+    ? Object.values(mp!.lastAttemptResults!).filter(Boolean).length
+    : 0;
+  const reviewTotal = allQuestions.length;
+  const reviewPercent =
+    isReviewing && reviewTotal > 0
+      ? Math.round((reviewScore / reviewTotal) * 100)
+      : 0;
+
   let questionCounter = 0;
 
   return (
@@ -125,14 +170,52 @@ export default function TestPage({
       <h1 className="text-2xl font-bold tracking-tight">
         {mod.title} — Тест
       </h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Ответьте на все вопросы и нажмите «Отправить». Для прохождения модуля
-        необходимо набрать{" "}
-        <strong>
-          {mod.passCriteria.threshold} из {mod.passCriteria.totalQuestions}
-        </strong>{" "}
-        баллов.
-      </p>
+
+      {isReviewing ? (
+        <div className="mt-4 space-y-4">
+          <Alert
+            className={
+              mp!.completed
+                ? "border-emerald-200 bg-emerald-50/50"
+                : "border-amber-200 bg-amber-50/50"
+            }
+          >
+            {mp!.completed ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+            )}
+            <AlertDescription className="flex flex-col gap-2">
+              <span>
+                {mp!.completed
+                  ? `Тест пройден — ${reviewScore} из ${reviewTotal} (${reviewPercent}%)`
+                  : `Тест не пройден — ${reviewScore} из ${reviewTotal} (${reviewPercent}%). Необходимо: ${mod.passCriteria.threshold} из ${mod.passCriteria.totalQuestions}`}
+              </span>
+              <Progress value={reviewPercent} className="h-2" />
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={handleRetake}
+              className="gap-2"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Пройти заново
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ответьте на все вопросы и нажмите «Отправить». Для прохождения модуля
+          необходимо набрать{" "}
+          <strong>
+            {mod.passCriteria.threshold} из {mod.passCriteria.totalQuestions}
+          </strong>{" "}
+          баллов.
+        </p>
+      )}
 
       {mod.testSections.map((section) => (
         <div key={section.id} className="mt-8">
@@ -151,8 +234,14 @@ export default function TestPage({
                   key={q.id}
                   question={q}
                   index={questionCounter}
-                  value={answers[q.id] || ""}
+                  value={activeAnswers[q.id] || ""}
                   onChange={(val) => setAnswer(q.id, val)}
+                  disabled={isReviewing}
+                  result={
+                    isReviewing
+                      ? mp!.lastAttemptResults![q.id]
+                      : undefined
+                  }
                 />
               );
             })}
@@ -160,20 +249,22 @@ export default function TestPage({
         </div>
       ))}
 
-      <div className="mt-10 flex items-center justify-between border-t pt-6">
-        <p className="text-sm text-muted-foreground">
-          Отвечено: {answeredCount} / {allQuestions.length}
-        </p>
-        <Button
-          size="lg"
-          onClick={handleSubmit}
-          disabled={answeredCount === 0}
-          className="gap-2"
-        >
-          <Send className="h-4 w-4" />
-          Отправить ответы
-        </Button>
-      </div>
+      {!isReviewing && (
+        <div className="mt-10 flex items-center justify-between border-t pt-6">
+          <p className="text-sm text-muted-foreground">
+            Отвечено: {answeredCount} / {allQuestions.length}
+          </p>
+          <Button
+            size="lg"
+            onClick={handleSubmit}
+            disabled={answeredCount === 0}
+            className="gap-2"
+          >
+            <Send className="h-4 w-4" />
+            Отправить ответы
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

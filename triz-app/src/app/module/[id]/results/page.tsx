@@ -32,7 +32,7 @@ export default function ResultsPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { getModuleProgress, isLoaded } = useProgress();
+  const { getModuleProgress, resetModuleProgress, isLoaded } = useProgress();
 
   const mod = getModuleById(id);
   const mp = isLoaded ? getModuleProgress(id) : undefined;
@@ -223,7 +223,10 @@ export default function ResultsPage({
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="outline"
-          onClick={() => router.push(`/module/${id}/test`)}
+          onClick={() => {
+            resetModuleProgress(id);
+            router.push(`/module/${id}/test`);
+          }}
           className="gap-2"
         >
           <RotateCcw className="h-4 w-4" />
