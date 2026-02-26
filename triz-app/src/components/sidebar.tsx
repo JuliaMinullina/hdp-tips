@@ -51,7 +51,7 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 z-30 flex h-screen w-72 flex-col border-r bg-card">
       <div className="flex items-center gap-2 px-5 py-5">
         <BookOpen className="h-6 w-6 text-primary" />
-        <h1 className="text-lg font-bold tracking-tight">ТРИЗ-тренажёр</h1>
+        <h1 className="text-lg font-bold tracking-tight">ТРИЗ</h1>
       </div>
 
       <Separator />

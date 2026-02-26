@@ -1,30 +1,60 @@
-/**
- * GigaChat API client — placeholder.
- *
- * To integrate:
- * 1. Add GIGACHAT_API_KEY to .env.local
- * 2. Implement checkWithGigaChat() below
- * 3. Use in /api/check-answer/route.ts
- */
+const OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
+const CHAT_URL =
+  "https://gigachat.devices.sberbank.ru/api/v1/chat/completions";
 
-export interface GigaChatResult {
-  correct: boolean;
-  feedback: string;
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+export async function getAccessToken(
+  authKey: string,
+  scope: string
+): Promise<string> {
+  if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
+    return cachedToken.token;
+  }
+
+  const res = await fetch(OAUTH_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${authKey}`,
+      RqUID: crypto.randomUUID(),
+    },
+    body: `scope=${scope}`,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`GigaChat OAuth error ${res.status}: ${text}`);
+  }
+
+  const data = await res.json();
+  cachedToken = {
+    token: data.access_token,
+    expiresAt: data.expires_at,
+  };
+
+  return cachedToken.token;
 }
 
-export async function checkWithGigaChat(
-  _questionText: string,
-  _userAnswer: string,
-  _referenceAnswer: string,
-  _apiKey: string
-): Promise<GigaChatResult> {
-  // TODO: Implement actual GigaChat API call
-  // 1. Obtain access token via POST https://ngw.devices.sberbank.ru:9443/api/v2/oauth
-  // 2. Send prompt to POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions
-  // 3. Parse response and return { correct, feedback }
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
 
-  return {
-    correct: false,
-    feedback: "GigaChat интеграция ещё не подключена. Сравните ответ с эталонным самостоятельно.",
-  };
+export async function streamChatCompletion(
+  token: string,
+  messages: ChatMessage[]
+): Promise<Response> {
+  return fetch(CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      model: "GigaChat",
+      messages,
+      stream: true,
+    }),
+  });
 }
