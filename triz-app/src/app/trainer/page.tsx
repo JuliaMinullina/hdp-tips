@@ -53,6 +53,13 @@ function buildTrainerTasks(): TrainerTask[] {
     }
   }
 
+  const mod4 = modules.find((m) => m.id === "module-4");
+  if (mod4) {
+    for (const section of mod4.practiceSections) {
+      tasks.push({ type: "quiz", moduleLabel: "Модуль 4", section });
+    }
+  }
+
   return tasks;
 }
 

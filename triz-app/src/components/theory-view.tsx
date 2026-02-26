@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 
 const components: Components = {
   table: ({ children, ...props }) => (
-    <div className="overflow-x-auto -mx-2 px-2 [&_th:first-child]:whitespace-nowrap [&_td:first-child]:whitespace-nowrap [&_th:first-child]:px-8 [&_td:first-child]:px-8">
+    <div className="overflow-x-auto [&_th:first-child]:sticky [&_th:first-child]:left-0 [&_th:first-child]:z-10 [&_th:first-child]:bg-muted [&_td:first-child]:sticky [&_td:first-child]:left-0 [&_td:first-child]:z-10 [&_td:first-child]:bg-background [&_th:first-child]:whitespace-nowrap [&_td:first-child]:whitespace-nowrap [&_th:first-child]:px-3 [&_td:first-child]:px-3 [&_td:first-child]:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
       <table {...props}>{children}</table>
     </div>
   ),
